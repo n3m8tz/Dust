@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Board Game Score Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #1a1a2e;
+      --surface:  #16213e;
+      --card:     #0f3460;
+      --accent:   #e94560;
+      --accent2:  #f5a623;
+      --text:     #eaeaea;
+      --muted:    #8892a4;
+      --success:  #4caf50;
+      --border:   rgba(255,255,255,0.08);
+      --radius:   12px;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px 16px 60px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    header h1 span { color: var(--accent); }
+
+    header p {
+      color: var(--muted);
+      margin-top: 6px;
+      font-size: 0.95rem;
+    }
+
+    /* ── Layout ── */
+    .app { max-width: 860px; margin: 0 auto; }
+
+    /* ── Session picker ── */
+    #session-screen { display: flex; flex-direction: column; gap: 16px; }
+
+    .sessions-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .sessions-header h2 { font-size: 1.1rem; color: var(--muted); font-weight: 600; }
+
+    .session-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .session-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.1s;
+    }
+
+    .session-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+
+    .session-card .meta { display: flex; flex-direction: column; gap: 3px; }
+    .session-card .game-name { font-weight: 700; font-size: 1.05rem; }
+    .session-card .game-info { font-size: 0.82rem; color: var(--muted); }
+
+    .session-card .card-actions { display: flex; gap: 8px; }
+
+    /* ── New session form ── */
+    .new-session-form {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .new-session-form h3 { font-size: 1rem; margin-bottom: 2px; }
+
+    .form-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .form-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 160px; }
+    .form-group label { font-size: 0.82rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+
+    input[type="text"], input[type="number"] {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+      width: 100%;
+    }
+
+    input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accent); }
+    input[type="text"]::placeholder { color: var(--muted); }
+
+    /* ── Buttons ── */
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    button:active { transform: scale(0.97); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 20px;
+      font-size: 0.95rem;
+    }
+
+    .btn-secondary {
+      background: var(--card);
+      color: var(--text);
+      padding: 10px 20px;
+      font-size: 0.95rem;
+      border: 1px solid var(--border);
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 0.82rem;
+    }
+
+    .btn-icon {
+      background: transparent;
+      color: var(--muted);
+      padding: 6px 8px;
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .btn-icon:hover { color: var(--accent); }
+
+    .btn-danger { background: #c0392b; color: #fff; }
+    .btn-success { background: var(--success); color: #fff; }
+
+    /* ── Game screen ── */
+    #game-screen { display: none; flex-direction: column; gap: 20px; }
+
+    .game-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .game-title { font-size: 1.6rem; font-weight: 800; }
+    .game-title small { display: block; font-size: 0.8rem; color: var(--muted); font-weight: 400; margin-top: 2px; }
+
+    .game-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    /* ── Round badge ── */
+    .round-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .round-badge button {
+      background: transparent;
+      color: var(--accent2);
+      padding: 2px 8px;
+      font-size: 1rem;
+    }
+
+    /* ── Players grid ── */
+    .players-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+    }
+
+    .player-card {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      transition: border-color 0.2s;
+    }
+
+    .player-card.leader { border-color: var(--accent2); }
+
+    .player-card .crown {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      font-size: 1.1rem;
+      display: none;
+    }
+
+    .player-card.leader .crown { display: block; }
+
+    .player-name-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .player-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .player-name-input {
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+      padding: 4px 2px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+      flex: 1;
+      min-width: 0;
+    }
+
+    .player-name-input:focus { border-bottom-color: var(--accent); outline: none; }
+
+    .score-display {
+      font-size: 2.4rem;
+      font-weight: 800;
+      text-align: center;
+      line-height: 1;
+      letter-spacing: -1px;
+    }
+
+    .score-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .score-controls input[type="number"] {
+      text-align: center;
+      padding: 8px 6px;
+      font-size: 0.9rem;
+      flex: 1;
+      -moz-appearance: textfield;
+    }
+
+    .score-controls input[type="number"]::-webkit-outer-spin-button,
+    .score-controls input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    .score-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .btn-add { background: var(--success); color: #fff; }
+    .btn-sub { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+
+    .remove-player {
+      position: absolute;
+      top: 8px;
+      left: 10px;
+      background: transparent;
+      color: transparent;
+      padding: 2px 4px;
+      font-size: 0.75rem;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+
+    .player-card:hover .remove-player { color: var(--muted); }
+    .remove-player:hover { color: var(--accent) !important; }
+
+    /* ── History panel ── */
+    .history-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .history-header {
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .history-header h3 { font-size: 0.95rem; font-weight: 700; }
+
+    .history-table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    th, td {
+      padding: 10px 16px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.78rem; letter-spacing: 0.04em; }
+    td:first-child, th:first-child { text-align: left; }
+    tr:last-child td { border-bottom: none; }
+
+    tbody tr:hover { background: var(--card); }
+
+    .delta-pos { color: var(--success); }
+    .delta-neg { color: var(--accent); }
+
+    /* ── Add player button ── */
+    .add-player-btn {
+      background: var(--surface);
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+      min-height: 80px;
+      font-family: inherit;
+      font-weight: 600;
+    }
+
+    .add-player-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--card);
+      color: var(--text);
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      opacity: 0;
+      transition: transform 0.25s, opacity 0.25s;
+      z-index: 999;
+      white-space: nowrap;
+    }
+
+    #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--muted);
+    }
+
+    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+    .empty-state p { font-size: 0.95rem; }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      header h1 { font-size: 1.5rem; }
+      .game-title { font-size: 1.3rem; }
+      .score-display { font-size: 2rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Board Game <span>Score Tracker</span></h1>
+      <p>Keep track of scores across all your games</p>
+    </header>
+
+    <!-- ── Session screen ── -->
+    <div id="session-screen">
+      <div class="sessions-header">
+        <h2>Your Games</h2>
+      </div>
+
+      <div id="session-list" class="session-list">
+        <!-- populated by JS -->
+      </div>
+
+      <div class="new-session-form" id="new-session-form">
+        <h3>Start a New Game</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="game-name-input">Game Name</label>
+            <input type="text" id="game-name-input" placeholder="e.g. Catan, Ticket to Ride…" autocomplete="off" />
+          </div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button class="btn-primary" id="create-session-btn">Create Game</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Game screen ── -->
+    <div id="game-screen">
+      <div class="game-header">
+        <div>
+          <div class="game-title" id="active-game-title">Game</div>
+          <small id="active-game-subtitle"></small>
+        </div>
+        <div class="game-controls">
+          <div class="round-badge">
+            <button id="round-dec" title="Previous round">−</button>
+            Round <span id="round-num">1</span>
+            <button id="round-inc" title="Next round">+</button>
+          </div>
+          <button class="btn-secondary btn-sm" id="reset-scores-btn">Reset Scores</button>
+          <button class="btn-secondary btn-sm" id="back-btn">← Games</button>
+        </div>
+      </div>
+
+      <div class="players-grid" id="players-grid">
+        <!-- player cards injected here -->
+      </div>
+
+      <div class="history-section">
+        <div class="history-header">
+          <h3>Score History</h3>
+          <button class="btn-icon" id="clear-history-btn" title="Clear history">🗑</button>
+        </div>
+        <div class="history-table-wrap">
+          <table id="history-table">
+            <thead>
+              <tr id="history-head-row">
+                <th>Round</th>
+                <!-- player columns added dynamically -->
+              </tr>
+            </thead>
+            <tbody id="history-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    // ─── Constants ───────────────────────────────────────────────
+    const STORAGE_KEY = 'bgs_sessions_v2';
+    const COLORS = ['#e94560','#f5a623','#4fc3f7','#81c784','#ce93d8','#ffb74d','#4db6ac','#f48fb1'];
+    const EMOJIS = ['🎲','🎯','♟️','🃏','🎮','🏆','⚔️','🎴'];
+
+    // ─── State ───────────────────────────────────────────────────
+    let sessions = [];
+    let activeSessionId = null;
+
+    // ─── Persistence ─────────────────────────────────────────────
+    function load() {
+      try { sessions = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+      catch { sessions = []; }
+    }
+
+    function save() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────
+    function uid() { return Math.random().toString(36).slice(2, 9); }
+
+    function getSession(id) { return sessions.find(s => s.id === id); }
+
+    function toast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.classList.remove('show'), 2200);
+    }
+
+    function playerColor(index) { return COLORS[index % COLORS.length]; }
+    function playerEmoji(index) { return EMOJIS[index % EMOJIS.length]; }
+
+    function playerInitial(name) {
+      return name.trim() ? name.trim()[0].toUpperCase() : '?';
+    }
+
+    // ─── Session List Rendering ───────────────────────────────────
+    function renderSessionList() {
+      const list = document.getElementById('session-list');
+      if (sessions.length === 0) {
+        list.innerHTML = `<div class="empty-state"><div class="icon">🎲</div><p>No games yet. Start one below!</p></div>`;
+        return;
+      }
+
+      list.innerHTML = sessions.map(s => {
+        const playerCount = s.players.length;
+        const leader = getLeader(s);
+        const leaderText = leader ? `Leader: ${leader.name} (${leader.score})` : 'No players yet';
+        const date = new Date(s.createdAt).toLocaleDateString();
+        return `
+          <div class="session-card" data-id="${s.id}">
+            <div class="meta">
+              <span class="game-name">${escHtml(s.name)}</span>
+              <span class="game-info">${playerCount} player${playerCount !== 1 ? 's' : ''} · Round ${s.round} · ${leaderText}</span>
+              <span class="game-info">Started ${date}</span>
+            </div>
+            <div class="card-actions">
+              <button class="btn-secondary btn-sm open-session" data-id="${s.id}">Open</button>
+              <button class="btn-icon delete-session" data-id="${s.id}" title="Delete game">🗑</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function getLeader(session) {
+      if (!session.players.length) return null;
+      return session.players.reduce((a, b) => a.score >= b.score ? a : b);
+    }
+
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ─── Session Creation ─────────────────────────────────────────
+    document.getElementById('create-session-btn').addEventListener('click', () => {
+      const nameEl = document.getElementById('game-name-input');
+      const name = nameEl.value.trim();
+      if (!name) { toast('Enter a game name first'); nameEl.focus(); return; }
+
+      const session = {
+        id: uid(),
+        name,
+        round: 1,
+        players: [],
+        history: [],
+        createdAt: Date.now(),
+      };
+      sessions.unshift(session);
+      save();
+      nameEl.value = '';
+      openGame(session.id);
+    });
+
+    document.getElementById('game-name-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('create-session-btn').click();
+    });
+
+    // ─── Open / Close Game ────────────────────────────────────────
+    function openGame(id) {
+      activeSessionId = id;
+      document.getElementById('session-screen').style.display = 'none';
+      const gs = document.getElementById('game-screen');
+      gs.style.display = 'flex';
+      renderGame();
+    }
+
+    document.getElementById('back-btn').addEventListener('click', () => {
+      activeSessionId = null;
+      document.getElementById('game-screen').style.display = 'none';
+      document.getElementById('session-screen').style.display = 'flex';
+      renderSessionList();
+    });
+
+    // ─── Game Rendering ───────────────────────────────────────────
+    function renderGame() {
+      const s = getSession(activeSessionId);
+      if (!s) return;
+
+      document.getElementById('active-game-title').textContent = s.name;
+      document.getElementById('active-game-subtitle').textContent =
+        `${s.players.length} player${s.players.length !== 1 ? 's' : ''}`;
+      document.getElementById('round-num').textContent = s.round;
+
+      renderPlayers();
+      renderHistory();
+    }
+
+    function renderPlayers() {
+      const s = getSession(activeSessionId);
+      const grid = document.getElementById('players-grid');
+      const maxScore = s.players.length ? Math.max(...s.players.map(p => p.score)) : 0;
+
+      grid.innerHTML = s.players.map((p, i) => {
+        const isLeader = s.players.length > 1 && p.score === maxScore && maxScore !== 0;
+        return `
+          <div class="player-card${isLeader ? ' leader' : ''}" data-pid="${p.id}">
+            <button class="remove-player" data-pid="${p.id}" title="Remove player">✕</button>
+            <span class="crown">👑</span>
+            <div class="player-name-row">
+              <div class="player-avatar" style="background:${playerColor(i)}20; color:${playerColor(i)}">
+                ${playerEmoji(i)}
+              </div>
+              <input class="player-name-input" type="text" value="${escHtml(p.name)}"
+                placeholder="Player name" maxlength="24" data-pid="${p.id}" />
+            </div>
+            <div class="score-display" style="color:${playerColor(i)}">${p.score}</div>
+            <div class="score-controls">
+              <button class="score-btn btn-sub" data-pid="${p.id}" data-action="sub" title="Subtract">−</button>
+              <input type="number" class="delta-input" data-pid="${p.id}" value="1" min="1" max="9999" />
+              <button class="score-btn btn-add" data-pid="${p.id}" data-action="add" title="Add">+</button>
+            </div>
+          </div>`;
+      }).join('');
+
+      // Add-player button
+      grid.innerHTML += `
+        <button class="add-player-btn" id="add-player-btn">
+          <span style="font-size:1.4rem">+</span> Add Player
+        </button>`;
+
+      // Wire events
+      grid.querySelectorAll('.score-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const pid = btn.dataset.pid;
+          const action = btn.dataset.action;
+          const input = grid.querySelector(`.delta-input[data-pid="${pid}"]`);
+          const delta = Math.max(1, parseInt(input.value) || 1);
+          adjustScore(pid, action === 'add' ? delta : -delta);
+        });
+      });
+
+      grid.querySelectorAll('.delta-input').forEach(inp => {
+        inp.addEventListener('keydown', e => {
+          if (e.key === 'Enter') {
+            const pid = inp.dataset.pid;
+            // default: add on Enter
+            const delta = Math.max(1, parseInt(inp.value) || 1);
+            adjustScore(pid, delta);
+          }
+        });
+      });
+
+      grid.querySelectorAll('.player-name-input').forEach(inp => {
+        inp.addEventListener('change', () => {
+          renamePlayer(inp.dataset.pid, inp.value.trim() || 'Player');
+        });
+      });
+
+      grid.querySelectorAll('.remove-player').forEach(btn => {
+        btn.addEventListener('click', () => removePlayer(btn.dataset.pid));
+      });
+
+      document.getElementById('add-player-btn').addEventListener('click', addPlayer);
+    }
+
+    // ─── Player Actions ───────────────────────────────────────────
+    function addPlayer() {
+      const s = getSession(activeSessionId);
+      const n = s.players.length + 1;
+      s.players.push({ id: uid(), name: `Player ${n}`, score: 0 });
+      save();
+      renderPlayers();
+      renderHistory();
+      renderSessionList();
+      // Focus the new player's name input
+      const inputs = document.querySelectorAll('.player-name-input');
+      if (inputs.length) inputs[inputs.length - 1].select();
+    }
+
+    function removePlayer(pid) {
+      const s = getSession(activeSessionId);
+      s.players = s.players.filter(p => p.id !== pid);
+      // remove from history deltas
+      s.history.forEach(row => { delete row.deltas[pid]; });
+      save();
+      renderPlayers();
+      renderHistory();
+      renderSessionList();
+    }
+
+    function renamePlayer(pid, name) {
+      const s = getSession(activeSessionId);
+      const p = s.players.find(p => p.id === pid);
+      if (p) { p.name = name; save(); renderHistory(); renderSessionList(); }
+    }
+
+    function adjustScore(pid, delta) {
+      const s = getSession(activeSessionId);
+      const p = s.players.find(p => p.id === pid);
+      if (!p) return;
+      p.score += delta;
+
+      // Record in history
+      let row = s.history.find(r => r.round === s.round);
+      if (!row) {
+        row = { round: s.round, deltas: {} };
+        s.history.push(row);
+      }
+      row.deltas[pid] = (row.deltas[pid] || 0) + delta;
+
+      save();
+      renderPlayers();
+      renderHistory();
+      renderSessionList();
+    }
+
+    // ─── Round Controls ───────────────────────────────────────────
+    document.getElementById('round-inc').addEventListener('click', () => {
+      const s = getSession(activeSessionId);
+      s.round++;
+      save();
+      document.getElementById('round-num').textContent = s.round;
+      toast(`Round ${s.round} started`);
+    });
+
+    document.getElementById('round-dec').addEventListener('click', () => {
+      const s = getSession(activeSessionId);
+      if (s.round <= 1) return;
+      s.round--;
+      save();
+      document.getElementById('round-num').textContent = s.round;
+    });
+
+    // ─── Reset / Clear ────────────────────────────────────────────
+    document.getElementById('reset-scores-btn').addEventListener('click', () => {
+      if (!confirm('Reset all scores to 0 and clear history?')) return;
+      const s = getSession(activeSessionId);
+      s.players.forEach(p => p.score = 0);
+      s.history = [];
+      s.round = 1;
+      save();
+      renderGame();
+      toast('Scores reset');
+    });
+
+    document.getElementById('clear-history-btn').addEventListener('click', () => {
+      if (!confirm('Clear score history?')) return;
+      const s = getSession(activeSessionId);
+      s.history = [];
+      save();
+      renderHistory();
+      toast('History cleared');
+    });
+
+    // ─── History Table ────────────────────────────────────────────
+    function renderHistory() {
+      const s = getSession(activeSessionId);
+      const headRow = document.getElementById('history-head-row');
+      const body = document.getElementById('history-body');
+
+      // Build header
+      headRow.innerHTML = '<th>Round</th>' +
+        s.players.map(p => `<th>${escHtml(p.name)}</th>`).join('') +
+        '<th>Leader</th>';
+
+      if (!s.history.length) {
+        body.innerHTML = `<tr><td colspan="${s.players.length + 2}" style="color:var(--muted);padding:20px;text-align:center;">No rounds played yet</td></tr>`;
+        return;
+      }
+
+      const sorted = [...s.history].sort((a, b) => a.round - b.round);
+
+      body.innerHTML = sorted.map(row => {
+        const cells = s.players.map(p => {
+          const d = row.deltas[p.id] || 0;
+          const cls = d > 0 ? 'delta-pos' : d < 0 ? 'delta-neg' : '';
+          const sign = d > 0 ? '+' : '';
+          return `<td class="${cls}">${d !== 0 ? sign + d : '—'}</td>`;
+        }).join('');
+
+        // Leader this round
+        let leader = '—';
+        if (s.players.length) {
+          const best = s.players.reduce((a, b) =>
+            (row.deltas[a.id] || 0) >= (row.deltas[b.id] || 0) ? a : b);
+          if ((row.deltas[best.id] || 0) !== 0) leader = best.name;
+        }
+
+        return `<tr><td><strong>R${row.round}</strong></td>${cells}<td>${escHtml(leader)}</td></tr>`;
+      }).join('');
+    }
+
+    // ─── Session List Events ──────────────────────────────────────
+    document.getElementById('session-list').addEventListener('click', e => {
+      const openBtn = e.target.closest('.open-session');
+      const delBtn  = e.target.closest('.delete-session');
+      const card    = e.target.closest('.session-card');
+
+      if (delBtn) {
+        e.stopPropagation();
+        const id = delBtn.dataset.id;
+        const s = getSession(id);
+        if (!confirm(`Delete "${s.name}"? This cannot be undone.`)) return;
+        sessions = sessions.filter(s => s.id !== id);
+        save();
+        renderSessionList();
+        return;
+      }
+
+      if (openBtn || card) {
+        const id = (openBtn || card).dataset.id;
+        if (id) openGame(id);
+      }
+    });
+
+    // ─── Boot ─────────────────────────────────────────────────────
+    load();
+    renderSessionList();
+  </script>
+</body>
+</html>
