@@ -447,7 +447,20 @@
     }
 
     .preset-card:hover { border-color: var(--accent); transform: translateY(-1px); }
-    .preset-card.selected { border-color: var(--accent); background: rgba(233,69,96,0.12); }
+
+    /* ── Wizard step 2 ── */
+    #wizard-step-2 { display: flex; flex-direction: column; gap: 14px; }
+
+    .wizard-nav {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .wizard-selected-game {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
 
     .preset-icon { font-size: 1.5rem; line-height: 1; }
     .preset-name { font-size: 0.83rem; font-weight: 700; }
@@ -563,29 +576,34 @@
 
     <!-- ── Session screen ── -->
     <div id="session-screen">
+
+      <!-- Step 1: pick a game -->
+      <div class="new-session-form" id="new-session-form">
+        <div id="wizard-step-1">
+          <h3>Start a New Game</h3>
+          <div class="presets-grid" id="preset-picker"><!-- populated by JS --></div>
+        </div>
+
+        <!-- Step 2: name it -->
+        <div id="wizard-step-2" style="display:none;">
+          <div class="wizard-nav">
+            <button class="btn-secondary btn-sm" id="wizard-back-btn">← Back</button>
+            <span class="wizard-selected-game" id="wizard-preset-label"></span>
+          </div>
+          <div class="form-group">
+            <label for="game-name-input">Game Name</label>
+            <input type="text" id="game-name-input" placeholder="Custom name (optional)" autocomplete="off" />
+          </div>
+          <button class="btn-primary" id="create-session-btn">Start Game</button>
+        </div>
+      </div>
+
+      <!-- Past games below -->
       <div class="sessions-header">
         <h2>Your Games</h2>
       </div>
-
       <div id="session-list" class="session-list">
         <!-- populated by JS -->
-      </div>
-
-      <div class="new-session-form" id="new-session-form">
-        <h3>Start a New Game</h3>
-        <div>
-          <span class="preset-picker-label">Choose a Game</span>
-          <div class="presets-grid" id="preset-picker"><!-- populated by JS --></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="game-name-input">Game Name</label>
-            <input type="text" id="game-name-input" placeholder="or type a custom name…" autocomplete="off" />
-          </div>
-        </div>
-        <div style="display:flex; gap:10px;">
-          <button class="btn-primary" id="create-session-btn">Create Game</button>
-        </div>
       </div>
     </div>
 
@@ -845,10 +863,15 @@
     }
 
     // ─── Preset Picker ────────────────────────────────────────────
+    function showWizardStep(n) {
+      document.getElementById('wizard-step-1').style.display = n === 1 ? '' : 'none';
+      document.getElementById('wizard-step-2').style.display = n === 2 ? '' : 'none';
+    }
+
     function renderPresetPicker() {
       const picker = document.getElementById('preset-picker');
       picker.innerHTML = GAME_PRESETS.map(p => `
-        <button class="preset-card${selectedPresetId === p.id ? ' selected' : ''}" data-preset-id="${p.id}">
+        <button class="preset-card" data-preset-id="${p.id}">
           <span class="preset-icon">${p.emoji}</span>
           <span class="preset-name">${p.name}</span>
           <span class="preset-desc">${p.desc}</span>
@@ -860,16 +883,19 @@
           if (!preset) return;
           selectedPresetId = preset.id;
           const nameEl = document.getElementById('game-name-input');
-          if (preset.id !== 'custom') {
-            nameEl.value = preset.name;
-          } else {
-            nameEl.value = '';
-            nameEl.focus();
-          }
-          renderPresetPicker();
+          nameEl.value = preset.id !== 'custom' ? preset.name : '';
+          document.getElementById('wizard-preset-label').textContent = `${preset.emoji} ${preset.name}`;
+          showWizardStep(2);
+          nameEl.select();
+          nameEl.focus();
         });
       });
     }
+
+    document.getElementById('wizard-back-btn').addEventListener('click', () => {
+      selectedPresetId = null;
+      showWizardStep(1);
+    });
 
     // ─── Session Creation ─────────────────────────────────────────
     document.getElementById('create-session-btn').addEventListener('click', () => {
@@ -892,6 +918,7 @@
       save();
       nameEl.value = '';
       selectedPresetId = null;
+      showWizardStep(1);
       renderPresetPicker();
       openGame(session.id);
     });
@@ -914,6 +941,7 @@
       selectedPresetId = null;
       document.getElementById('game-screen').style.display = 'none';
       document.getElementById('session-screen').style.display = 'flex';
+      showWizardStep(1);
       renderSessionList();
       renderPresetPicker();
     });
