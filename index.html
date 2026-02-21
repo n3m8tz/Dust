@@ -412,6 +412,100 @@
     .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
     .empty-state p { font-size: 0.95rem; }
 
+    /* ── Game Presets Picker ── */
+    .preset-picker-label {
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .presets-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 8px;
+    }
+
+    .preset-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 8px;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 0.15s, transform 0.1s, background 0.15s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      font-family: inherit;
+      color: var(--text);
+      width: 100%;
+    }
+
+    .preset-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .preset-card.selected { border-color: var(--accent); background: rgba(233,69,96,0.12); }
+
+    .preset-icon { font-size: 1.5rem; line-height: 1; }
+    .preset-name { font-size: 0.83rem; font-weight: 700; }
+    .preset-desc { font-size: 0.7rem; color: var(--muted); line-height: 1.3; }
+
+    /* ── Win Condition Badge ── */
+    .win-condition-badge {
+      display: inline-block;
+      font-size: 0.78rem;
+      color: var(--accent2);
+      background: rgba(245,166,35,0.12);
+      border: 1px solid rgba(245,166,35,0.3);
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+
+    /* ── Quick Scores ── */
+    .quick-scores-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .quick-scores-label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .quick-scores-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .qs-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 3px 7px;
+      font-size: 0.72rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 600;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+
+    .qs-btn:hover { border-color: var(--success); background: rgba(76,175,80,0.1); color: var(--success); }
+
+    /* ── Winner highlight ── */
+    .player-card.winner { border-color: gold !important; box-shadow: 0 0 16px rgba(255,215,0,0.18); }
+
     /* ── Responsive ── */
     @media (max-width: 480px) {
       header h1 { font-size: 1.5rem; }
@@ -439,10 +533,14 @@
 
       <div class="new-session-form" id="new-session-form">
         <h3>Start a New Game</h3>
+        <div>
+          <span class="preset-picker-label">Choose a Game</span>
+          <div class="presets-grid" id="preset-picker"><!-- populated by JS --></div>
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label for="game-name-input">Game Name</label>
-            <input type="text" id="game-name-input" placeholder="e.g. Catan, Ticket to Ride…" autocomplete="off" />
+            <input type="text" id="game-name-input" placeholder="or type a custom name…" autocomplete="off" />
           </div>
         </div>
         <div style="display:flex; gap:10px;">
@@ -456,7 +554,10 @@
       <div class="game-header">
         <div>
           <div class="game-title" id="active-game-title">Game</div>
-          <small id="active-game-subtitle"></small>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px;">
+            <small id="active-game-subtitle"></small>
+            <span id="win-condition-badge" class="win-condition-badge" style="display:none"></span>
+          </div>
         </div>
         <div class="game-controls">
           <div class="round-badge">
@@ -501,9 +602,140 @@
     const COLORS = ['#e94560','#f5a623','#4fc3f7','#81c784','#ce93d8','#ffb74d','#4db6ac','#f48fb1'];
     const EMOJIS = ['🎲','🎯','♟️','🃏','🎮','🏆','⚔️','🎴'];
 
+    const GAME_PRESETS = [
+      {
+        id: 'catan', name: 'Catan', emoji: '🏔️',
+        desc: 'First to 10 VP wins',
+        winCondition: 10, winLabel: 'VP',
+        defaultDelta: 1,
+        quickScores: [
+          { label: 'Settlement', v: 1 },
+          { label: 'City', v: 2 },
+          { label: 'Longest Road', v: 2 },
+          { label: 'Largest Army', v: 2 },
+          { label: 'VP Card', v: 1 },
+        ],
+      },
+      {
+        id: 'carcassonne', name: 'Carcassonne', emoji: '🏰',
+        desc: 'Most points from tiles',
+        winCondition: null,
+        defaultDelta: 2,
+        quickScores: [
+          { label: 'Road/tile', v: 1 },
+          { label: 'City/tile', v: 2 },
+          { label: 'Pennant', v: 2 },
+          { label: 'Cloister', v: 9 },
+          { label: 'Farm/city', v: 3 },
+        ],
+      },
+      {
+        id: 'ticket-to-ride', name: 'Ticket to Ride', emoji: '🚂',
+        desc: 'Longest routes & tickets',
+        winCondition: null,
+        defaultDelta: 4,
+        quickScores: [
+          { label: '1 car', v: 1 },
+          { label: '2 cars', v: 2 },
+          { label: '3 cars', v: 4 },
+          { label: '4 cars', v: 7 },
+          { label: '5 cars', v: 10 },
+          { label: '6 cars', v: 15 },
+        ],
+      },
+      {
+        id: '7-wonders', name: '7 Wonders', emoji: '🏛️',
+        desc: 'Most points across 3 ages',
+        winCondition: null,
+        defaultDelta: 1,
+        quickScores: [
+          { label: 'Military', v: 1 },
+          { label: 'Commerce', v: 2 },
+          { label: 'Wonder', v: 3 },
+          { label: 'Civilian', v: 3 },
+          { label: 'Guild', v: 3 },
+          { label: 'Science', v: 4 },
+        ],
+      },
+      {
+        id: 'azul', name: 'Azul', emoji: '🔷',
+        desc: 'Most points from tiles',
+        winCondition: null,
+        defaultDelta: 1,
+        quickScores: [
+          { label: 'Tile', v: 1 },
+          { label: 'Row', v: 2 },
+          { label: 'Column', v: 7 },
+          { label: 'Color set', v: 10 },
+        ],
+      },
+      {
+        id: 'wingspan', name: 'Wingspan', emoji: '🦅',
+        desc: 'Most points from birds & eggs',
+        winCondition: null,
+        defaultDelta: 1,
+        quickScores: [
+          { label: 'Bird card', v: 1 },
+          { label: 'Egg', v: 1 },
+          { label: 'Food cache', v: 1 },
+          { label: 'Tucked card', v: 1 },
+          { label: 'Round goal', v: 5 },
+        ],
+      },
+      {
+        id: 'splendor', name: 'Splendor', emoji: '💎',
+        desc: 'First to 15 prestige points',
+        winCondition: 15, winLabel: 'PP',
+        defaultDelta: 1,
+        quickScores: [
+          { label: 'Card Lv1', v: 1 },
+          { label: 'Card Lv2', v: 2 },
+          { label: 'Card Lv3', v: 3 },
+          { label: 'Noble', v: 3 },
+          { label: 'Card +4', v: 4 },
+          { label: 'Card +5', v: 5 },
+        ],
+      },
+      {
+        id: 'terraforming-mars', name: 'Terraforming Mars', emoji: '🪐',
+        desc: 'Most TR & VP on Mars',
+        winCondition: null,
+        defaultDelta: 1,
+        quickScores: [
+          { label: 'TR', v: 1 },
+          { label: 'Greenery', v: 1 },
+          { label: 'Milestone', v: 5 },
+          { label: 'Award 1st', v: 5 },
+          { label: 'Award 2nd', v: 2 },
+          { label: 'City adj', v: 1 },
+        ],
+      },
+      {
+        id: 'dominion', name: 'Dominion', emoji: '👑',
+        desc: 'Most victory points',
+        winCondition: null,
+        defaultDelta: 1,
+        quickScores: [
+          { label: 'Province', v: 6 },
+          { label: 'Duchy', v: 3 },
+          { label: 'Estate', v: 1 },
+          { label: 'Curse', v: -1 },
+          { label: 'Colony', v: 10 },
+        ],
+      },
+      {
+        id: 'custom', name: 'Custom', emoji: '🎲',
+        desc: 'Any game you like',
+        winCondition: null,
+        defaultDelta: 1,
+        quickScores: [],
+      },
+    ];
+
     // ─── State ───────────────────────────────────────────────────
     let sessions = [];
     let activeSessionId = null;
+    let selectedPresetId = null;
 
     // ─── Persistence ─────────────────────────────────────────────
     function load() {
@@ -572,15 +804,45 @@
       return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
+    // ─── Preset Picker ────────────────────────────────────────────
+    function renderPresetPicker() {
+      const picker = document.getElementById('preset-picker');
+      picker.innerHTML = GAME_PRESETS.map(p => `
+        <button class="preset-card${selectedPresetId === p.id ? ' selected' : ''}" data-preset-id="${p.id}">
+          <span class="preset-icon">${p.emoji}</span>
+          <span class="preset-name">${p.name}</span>
+          <span class="preset-desc">${p.desc}</span>
+        </button>`).join('');
+
+      picker.querySelectorAll('.preset-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const preset = GAME_PRESETS.find(p => p.id === card.dataset.presetId);
+          if (!preset) return;
+          selectedPresetId = preset.id;
+          const nameEl = document.getElementById('game-name-input');
+          if (preset.id !== 'custom') {
+            nameEl.value = preset.name;
+          } else {
+            nameEl.value = '';
+            nameEl.focus();
+          }
+          renderPresetPicker();
+        });
+      });
+    }
+
     // ─── Session Creation ─────────────────────────────────────────
     document.getElementById('create-session-btn').addEventListener('click', () => {
       const nameEl = document.getElementById('game-name-input');
       const name = nameEl.value.trim();
       if (!name) { toast('Enter a game name first'); nameEl.focus(); return; }
 
+      const preset = GAME_PRESETS.find(p => p.id === selectedPresetId);
       const session = {
         id: uid(),
         name,
+        presetId: selectedPresetId,
+        defaultDelta: preset ? preset.defaultDelta : 1,
         round: 1,
         players: [],
         history: [],
@@ -589,6 +851,8 @@
       sessions.unshift(session);
       save();
       nameEl.value = '';
+      selectedPresetId = null;
+      renderPresetPicker();
       openGame(session.id);
     });
 
@@ -607,9 +871,11 @@
 
     document.getElementById('back-btn').addEventListener('click', () => {
       activeSessionId = null;
+      selectedPresetId = null;
       document.getElementById('game-screen').style.display = 'none';
       document.getElementById('session-screen').style.display = 'flex';
       renderSessionList();
+      renderPresetPicker();
     });
 
     // ─── Game Rendering ───────────────────────────────────────────
@@ -622,6 +888,15 @@
         `${s.players.length} player${s.players.length !== 1 ? 's' : ''}`;
       document.getElementById('round-num').textContent = s.round;
 
+      const winBadge = document.getElementById('win-condition-badge');
+      const preset = GAME_PRESETS.find(p => p.id === s.presetId);
+      if (preset && preset.winCondition) {
+        winBadge.textContent = `🏆 First to ${preset.winCondition} ${preset.winLabel || 'pts'} wins`;
+        winBadge.style.display = 'inline-block';
+      } else {
+        winBadge.style.display = 'none';
+      }
+
       renderPlayers();
       renderHistory();
     }
@@ -630,13 +905,30 @@
       const s = getSession(activeSessionId);
       const grid = document.getElementById('players-grid');
       const maxScore = s.players.length ? Math.max(...s.players.map(p => p.score)) : 0;
+      const preset = GAME_PRESETS.find(p => p.id === s.presetId);
+      const defaultDelta = s.defaultDelta || 1;
 
       grid.innerHTML = s.players.map((p, i) => {
         const isLeader = s.players.length > 1 && p.score === maxScore && maxScore !== 0;
+        const isWinner = preset && preset.winCondition && p.score >= preset.winCondition;
+        let extraClass = '';
+        if (isWinner) extraClass = ' winner';
+        else if (isLeader) extraClass = ' leader';
+
+        const quickScoresHtml = preset && preset.quickScores.length ? `
+          <div class="quick-scores-wrap">
+            <span class="quick-scores-label">Quick Score</span>
+            <div class="quick-scores-row">
+              ${preset.quickScores.map(qs =>
+                `<button class="qs-btn" data-pid="${p.id}" data-value="${qs.v}" title="+${qs.v}">${qs.label} +${qs.v}</button>`
+              ).join('')}
+            </div>
+          </div>` : '';
+
         return `
-          <div class="player-card${isLeader ? ' leader' : ''}" data-pid="${p.id}">
+          <div class="player-card${extraClass}" data-pid="${p.id}">
             <button class="remove-player" data-pid="${p.id}" title="Remove player">✕</button>
-            <span class="crown">👑</span>
+            <span class="crown">${isWinner ? '🏆' : '👑'}</span>
             <div class="player-name-row">
               <div class="player-avatar" style="background:${playerColor(i)}20; color:${playerColor(i)}">
                 ${playerEmoji(i)}
@@ -647,9 +939,10 @@
             <div class="score-display" style="color:${playerColor(i)}">${p.score}</div>
             <div class="score-controls">
               <button class="score-btn btn-sub" data-pid="${p.id}" data-action="sub" title="Subtract">−</button>
-              <input type="number" class="delta-input" data-pid="${p.id}" value="1" min="1" max="9999" />
+              <input type="number" class="delta-input" data-pid="${p.id}" value="${defaultDelta}" min="1" max="9999" />
               <button class="score-btn btn-add" data-pid="${p.id}" data-action="add" title="Add">+</button>
             </div>
+            ${quickScoresHtml}
           </div>`;
       }).join('');
 
@@ -689,6 +982,12 @@
 
       grid.querySelectorAll('.remove-player').forEach(btn => {
         btn.addEventListener('click', () => removePlayer(btn.dataset.pid));
+      });
+
+      grid.querySelectorAll('.qs-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          adjustScore(btn.dataset.pid, parseInt(btn.dataset.value));
+        });
       });
 
       document.getElementById('add-player-btn').addEventListener('click', addPlayer);
@@ -743,6 +1042,12 @@
       renderPlayers();
       renderHistory();
       renderSessionList();
+
+      // Check win condition
+      const preset = GAME_PRESETS.find(pr => pr.id === s.presetId);
+      if (preset && preset.winCondition && p.score >= preset.winCondition) {
+        toast(`🏆 ${p.name} wins with ${p.score} ${preset.winLabel || 'points'}!`);
+      }
     }
 
     // ─── Round Controls ───────────────────────────────────────────
@@ -847,6 +1152,7 @@
     // ─── Boot ─────────────────────────────────────────────────────
     load();
     renderSessionList();
+    renderPresetPicker();
   </script>
 </body>
 </html>
