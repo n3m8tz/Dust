@@ -535,6 +535,14 @@
       white-space: nowrap;
     }
 
+    .tally-chip.tally-zero {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--muted);
+      font-weight: 600;
+      opacity: 0.55;
+    }
+
     /* ── Winner highlight ── */
     .player-card.winner { border-color: gold !important; box-shadow: 0 0 16px rgba(255,215,0,0.18); }
 
@@ -958,14 +966,14 @@
           </div>` : '';
 
         const tally = p.breakdown || {};
-        const tallyEntries = preset ? preset.quickScores
-          .filter(qs => tally[qs.label] > 0)
-          .map(qs => ({ label: qs.label, count: tally[qs.label] })) : [];
-        const tallyHtml = tallyEntries.length ? `
+        const tallyHtml = preset && preset.quickScores.length ? `
           <div class="tally-wrap">
             <span class="tally-label">Tally</span>
             <div class="tally-chips">
-              ${tallyEntries.map(e => `<span class="tally-chip">${escHtml(e.label)} ×${e.count}</span>`).join('')}
+              ${preset.quickScores.map(qs => {
+                const count = tally[qs.label] || 0;
+                return `<span class="tally-chip${count === 0 ? ' tally-zero' : ''}">${escHtml(qs.label)} ×${count}</span>`;
+              }).join('')}
             </div>
           </div>` : '';
 
