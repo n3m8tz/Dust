@@ -503,6 +503,38 @@
 
     .qs-btn:hover { border-color: var(--success); background: rgba(76,175,80,0.1); color: var(--success); }
 
+    /* ── Score Tally ── */
+    .tally-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .tally-label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .tally-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .tally-chip {
+      background: rgba(245,166,35,0.1);
+      border: 1px solid rgba(245,166,35,0.25);
+      color: var(--accent2);
+      padding: 2px 8px;
+      font-size: 0.72rem;
+      border-radius: 6px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
     /* ── Winner highlight ── */
     .player-card.winner { border-color: gold !important; box-shadow: 0 0 16px rgba(255,215,0,0.18); }
 
@@ -920,8 +952,20 @@
             <span class="quick-scores-label">Quick Score</span>
             <div class="quick-scores-row">
               ${preset.quickScores.map(qs =>
-                `<button class="qs-btn" data-pid="${p.id}" data-value="${qs.v}" title="+${qs.v}">${qs.label} +${qs.v}</button>`
+                `<button class="qs-btn" data-pid="${p.id}" data-value="${qs.v}" data-label="${escHtml(qs.label)}" title="+${qs.v}">${qs.label} +${qs.v}</button>`
               ).join('')}
+            </div>
+          </div>` : '';
+
+        const tally = p.breakdown || {};
+        const tallyEntries = preset ? preset.quickScores
+          .filter(qs => tally[qs.label] > 0)
+          .map(qs => ({ label: qs.label, count: tally[qs.label] })) : [];
+        const tallyHtml = tallyEntries.length ? `
+          <div class="tally-wrap">
+            <span class="tally-label">Tally</span>
+            <div class="tally-chips">
+              ${tallyEntries.map(e => `<span class="tally-chip">${escHtml(e.label)} ×${e.count}</span>`).join('')}
             </div>
           </div>` : '';
 
@@ -943,6 +987,7 @@
               <button class="score-btn btn-add" data-pid="${p.id}" data-action="add" title="Add">+</button>
             </div>
             ${quickScoresHtml}
+            ${tallyHtml}
           </div>`;
       }).join('');
 
@@ -986,7 +1031,7 @@
 
       grid.querySelectorAll('.qs-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          adjustScore(btn.dataset.pid, parseInt(btn.dataset.value));
+          adjustScore(btn.dataset.pid, parseInt(btn.dataset.value), btn.dataset.label);
         });
       });
 
@@ -1024,11 +1069,17 @@
       if (p) { p.name = name; save(); renderHistory(); renderSessionList(); }
     }
 
-    function adjustScore(pid, delta) {
+    function adjustScore(pid, delta, label) {
       const s = getSession(activeSessionId);
       const p = s.players.find(p => p.id === pid);
       if (!p) return;
       p.score += delta;
+
+      // Track quick-score tally
+      if (label) {
+        if (!p.breakdown) p.breakdown = {};
+        p.breakdown[label] = (p.breakdown[label] || 0) + 1;
+      }
 
       // Record in history
       let row = s.history.find(r => r.round === s.round);
@@ -1071,7 +1122,7 @@
     document.getElementById('reset-scores-btn').addEventListener('click', () => {
       if (!confirm('Reset all scores to 0 and clear history?')) return;
       const s = getSession(activeSessionId);
-      s.players.forEach(p => p.score = 0);
+      s.players.forEach(p => { p.score = 0; p.breakdown = {}; });
       s.history = [];
       s.round = 1;
       save();
