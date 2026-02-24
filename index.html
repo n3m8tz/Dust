@@ -360,6 +360,11 @@
     .delta-pos { color: var(--success); }
     .delta-neg { color: var(--accent); }
 
+    /* ── Running-total history cells (Scrabble etc.) ── */
+    td:has(.hist-delta) { line-height: 1; vertical-align: middle; }
+    .hist-delta { display: block; font-weight: 700; }
+    .hist-total { display: block; font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
     /* ── Add player button ── */
     .add-player-btn {
       background: var(--surface);
@@ -782,6 +787,17 @@
         ],
       },
       {
+        id: 'scrabble', name: 'Scrabble', emoji: '🔤',
+        desc: 'Highest total word score wins',
+        winCondition: null,
+        defaultDelta: 1,
+        roundLabel: 'Turn',
+        showRunningTotal: true,
+        quickScores: [
+          { label: 'Bingo', v: 50 },
+        ],
+      },
+      {
         id: 'custom', name: 'Custom', emoji: '🎲',
         desc: 'Any game you like',
         winCondition: null,
@@ -1178,26 +1194,43 @@
     // ─── History Table ────────────────────────────────────────────
     function renderHistory() {
       const s = getSession(activeSessionId);
+      const preset = GAME_PRESETS.find(p => p.id === s.presetId);
+      const roundLabel = preset && preset.roundLabel ? preset.roundLabel : 'Round';
+      const showRunning = !!(preset && preset.showRunningTotal);
+      const roundPrefix = roundLabel === 'Turn' ? 'T' : 'R';
+
       const headRow = document.getElementById('history-head-row');
       const body = document.getElementById('history-body');
 
       // Build header
-      headRow.innerHTML = '<th>Round</th>' +
+      headRow.innerHTML = `<th>${roundLabel}</th>` +
         s.players.map(p => `<th>${escHtml(p.name)}</th>`).join('') +
         '<th>Leader</th>';
 
       if (!s.history.length) {
-        body.innerHTML = `<tr><td colspan="${s.players.length + 2}" style="color:var(--muted);padding:20px;text-align:center;">No rounds played yet</td></tr>`;
+        body.innerHTML = `<tr><td colspan="${s.players.length + 2}" style="color:var(--muted);padding:20px;text-align:center;">No turns played yet</td></tr>`;
         return;
       }
 
       const sorted = [...s.history].sort((a, b) => a.round - b.round);
 
+      // Running totals per player (only used when showRunning is true)
+      const running = {};
+
       body.innerHTML = sorted.map(row => {
         const cells = s.players.map(p => {
           const d = row.deltas[p.id] || 0;
+          if (showRunning) running[p.id] = (running[p.id] || 0) + d;
           const cls = d > 0 ? 'delta-pos' : d < 0 ? 'delta-neg' : '';
           const sign = d > 0 ? '+' : '';
+
+          if (showRunning) {
+            const total = running[p.id] || 0;
+            return `<td class="${cls}">
+              <span class="hist-delta">${d !== 0 ? sign + d : '—'}</span>
+              ${d !== 0 ? `<span class="hist-total">${total}</span>` : ''}
+            </td>`;
+          }
           return `<td class="${cls}">${d !== 0 ? sign + d : '—'}</td>`;
         }).join('');
 
@@ -1209,7 +1242,7 @@
           if ((row.deltas[best.id] || 0) !== 0) leader = best.name;
         }
 
-        return `<tr><td><strong>R${row.round}</strong></td>${cells}<td>${escHtml(leader)}</td></tr>`;
+        return `<tr><td><strong>${roundPrefix}${row.round}</strong></td>${cells}<td>${escHtml(leader)}</td></tr>`;
       }).join('');
     }
 
