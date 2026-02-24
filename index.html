@@ -626,7 +626,7 @@
           <div class="round-badge">
             <button id="round-dec" title="Previous round">−</button>
             Round <span id="round-num">1</span>
-            <button id="round-inc" title="Next round">+</button>
+            <button id="round-inc" title="Commit all scores and start next round">End Round</button>
           </div>
           <button class="btn-secondary btn-sm" id="reset-scores-btn">Reset Scores</button>
           <button class="btn-secondary btn-sm" id="back-btn">← Games</button>
@@ -1038,9 +1038,9 @@
             </div>
             <div class="score-display" style="color:${playerColor(i)}">${p.score}</div>
             <div class="score-controls">
-              <button class="score-btn btn-sub" data-pid="${p.id}" data-action="sub" title="Subtract">−</button>
-              <input type="number" class="delta-input" data-pid="${p.id}" value="${defaultDelta}" min="1" max="9999" />
-              <button class="score-btn btn-add" data-pid="${p.id}" data-action="add" title="Add">+</button>
+              <button class="score-btn btn-sub" data-pid="${p.id}" data-action="sub" title="Decrease score for this round">−</button>
+              <input type="number" class="delta-input" data-pid="${p.id}" value="0" min="0" max="9999" placeholder="0" />
+              <button class="score-btn btn-add" data-pid="${p.id}" data-action="add" title="Increase score for this round">+</button>
             </div>
             ${quickScoresHtml}
             ${tallyHtml}
@@ -1059,8 +1059,9 @@
           const pid = btn.dataset.pid;
           const action = btn.dataset.action;
           const input = grid.querySelector(`.delta-input[data-pid="${pid}"]`);
-          const delta = Math.max(1, parseInt(input.value) || 1);
-          adjustScore(pid, action === 'add' ? delta : -delta);
+          const step = s.defaultDelta || 1;
+          const current = parseInt(input.value) || 0;
+          input.value = action === 'add' ? current + step : Math.max(0, current - step);
         });
       });
 
@@ -1068,9 +1069,8 @@
         inp.addEventListener('keydown', e => {
           if (e.key === 'Enter') {
             const pid = inp.dataset.pid;
-            // default: add on Enter
-            const delta = Math.max(1, parseInt(inp.value) || 1);
-            adjustScore(pid, delta);
+            const delta = parseInt(inp.value) || 0;
+            if (delta !== 0) adjustScore(pid, delta);
           }
         });
       });
@@ -1169,9 +1169,27 @@
     // ─── Round Controls ───────────────────────────────────────────
     document.getElementById('round-inc').addEventListener('click', () => {
       const s = getSession(activeSessionId);
+      const grid = document.getElementById('players-grid');
+
+      // Collect all pending delta-input values before any re-render
+      const deltas = {};
+      s.players.forEach(p => {
+        const input = grid.querySelector(`.delta-input[data-pid="${p.id}"]`);
+        deltas[p.id] = parseInt(input?.value) || 0;
+      });
+
+      // Apply all non-zero deltas — all use the same s.round so they land in one history row
+      s.players.forEach(p => {
+        if (deltas[p.id] !== 0) adjustScore(p.id, deltas[p.id]);
+      });
+
+      // Advance round, then re-render (delta inputs reset to 0 via renderPlayers)
       s.round++;
       save();
       document.getElementById('round-num').textContent = s.round;
+      renderPlayers();
+      renderHistory();
+      renderSessionList();
       toast(`Round ${s.round} started`);
     });
 
