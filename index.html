@@ -791,8 +791,9 @@
         desc: 'Highest total word score wins',
         winCondition: null,
         defaultDelta: 1,
-        roundLabel: 'Turn',
+        roundLabel: 'Word',
         showRunningTotal: true,
+        autoAdvanceTurn: true,
         quickScores: [
           { label: 'Bingo', v: 50 },
         ],
@@ -974,6 +975,9 @@
 
       const winBadge = document.getElementById('win-condition-badge');
       const preset = GAME_PRESETS.find(p => p.id === s.presetId);
+      // Hide manual round controls for games that auto-advance per score entry
+      document.querySelector('.round-badge').style.display =
+        (preset && preset.autoAdvanceTurn) ? 'none' : '';
       if (preset && preset.winCondition) {
         winBadge.textContent = `🏆 First to ${preset.winCondition} ${preset.winLabel || 'pts'} wins`;
         winBadge.style.display = 'inline-block';
@@ -1134,10 +1138,20 @@
       }
 
       // Record in history
-      let row = s.history.find(r => r.round === s.round);
-      if (!row) {
+      const preset = GAME_PRESETS.find(pr => pr.id === s.presetId);
+      const autoAdvance = preset && preset.autoAdvanceTurn;
+      let row;
+      if (autoAdvance) {
+        // Each score entry gets its own row
         row = { round: s.round, deltas: {} };
         s.history.push(row);
+        s.round++;
+      } else {
+        row = s.history.find(r => r.round === s.round);
+        if (!row) {
+          row = { round: s.round, deltas: {} };
+          s.history.push(row);
+        }
       }
       row.deltas[pid] = (row.deltas[pid] || 0) + delta;
 
@@ -1147,7 +1161,6 @@
       renderSessionList();
 
       // Check win condition
-      const preset = GAME_PRESETS.find(pr => pr.id === s.presetId);
       if (preset && preset.winCondition && p.score >= preset.winCondition) {
         toast(`🏆 ${p.name} wins with ${p.score} ${preset.winLabel || 'points'}!`);
       }
